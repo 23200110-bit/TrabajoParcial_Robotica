@@ -1,15 +1,9 @@
 import time
 
-# =====================================================================
-# PARÁMETROS DE SEGURIDAD DEL ENTORNO (P4)
-# =====================================================================
 POSE_ORIGINAL_ANGULOS = [0, 0, 0, 0, 0, 0]
 Z_MINIMO_SEGURO = 80.0     # Límite absoluto antes de chocar con la mesa 
 Z_TRANSITO_SEGURO = 160.0  # Altura de vuelo sobre las cajas/cámara 
 
-# =====================================================================
-# ESCENARIO 1: PREVENCIÓN DE COLISIÓN CON LA MESA
-# =====================================================================
 def ejecutar_movimiento_seguro(mc, coords_destino, velocidad=35):
     """
     Verifica que la coordenada Z destino no sea menor al umbral seguro.
@@ -40,9 +34,6 @@ def ejecutar_movimiento_seguro(mc, coords_destino, velocidad=35):
         time.sleep(3.5) 
         return True 
 
-# =====================================================================
-# ESCENARIO 2: EVASIÓN LATERAL DEL ENTORNO (WAYPOINTS)
-# =====================================================================
 def ejecutar_movimiento_anti_entorno(mc, coords_destino, velocidad=35):
     """
     Genera una trayectoria en forma de 'U' invertida (Herradura) 
