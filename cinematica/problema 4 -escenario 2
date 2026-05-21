@@ -1,0 +1,120 @@
+import time
+from pymycobot.mycobot import MyCobot
+
+
+# ==========================================
+# 1. CONFIGURACIÓN E INICIALIZACIÓN
+# ==========================================
+PUERTO = 'COM3'  # Ajusta tu puerto serial real
+BAUD = 115200
+
+
+try:
+    mc = MyCobot(PUERTO, BAUD)
+    print("Conexión establecida con MyCobot 280.")
+    mc.power_on()
+    time.sleep(1)
+except Exception as e:
+    print(f"Error al conectar: {e}")
+
+
+# ==========================================
+# 2. PARÁMETROS DE SEGURIDAD DEL ENTORNO
+# ==========================================
+# Pose inicial segura del laboratorio a la que regresa si el pipeline termina o se reinicia
+POSE_ORIGINAL_ANGULOS = [0, 0, 0, 0, 0, 0]
+
+
+# ALTURA DE TRÁNSITO SEGURA (Clearance):
+# Esta altura Z debe ser lo suficientemente alta para pasar por ENCIMA de las cajas
+# de depósito y la estructura de la cámara. Ajusta según la altura física de los objetos.
+Z_TRANSITO_SEGURO = 160.0  
+
+
+VELOCIDAD_TRAYECTORIA = 35
+VELOCIDAD_RETORNO = 50
+
+
+# ==========================================
+# 3. CONTROL DE TRAYECTORIA SEGURA (WAYPOINTS)
+# ==========================================
+
+
+def ejecutar_movimiento_anti_entorno(coords_destino):
+    """
+    Evita colisiones laterales con objetos del entorno (Caso c).
+    En lugar de ir en diagonal, genera una trayectoria en 'puente' utilizando waypoints.
+    Al finalizar el movimiento, regresa al estado original seguro.
+    """
+    x_dest, y_dest, z_dest, rx, ry, rz = coords_destino
+   
+    print(f"\n[NUEVO OBJETIVO DETECTADO] Destino final solicitado: X={x_dest}, Y={y_dest}, Z={z_dest}")
+    print("[PREVENCIÓN ACTIVADA] Evitando trayectoria diagonal recta contra cajas/cámaras.")
+   
+    # 1. Obtener la posición actual del robot antes de iniciar el viaje
+    pos_actual = mc.get_coords()
+    if not pos_actual:
+        time.sleep(0.3)
+        pos_actual = mc.get_coords()
+       
+    if not pos_actual:
+        print("[ERROR] No se pudo leer la posición actual del MyCobot. Operación cancelada.")
+        return False
+       
+    x_act, y_act, z_act = pos_actual[0], pos_actual[1], pos_actual[2]
+    print(f"-> Posición de origen actual: X={x_act:.1f}, Y={y_act:.1f}, Z={z_act:.1f}")
+
+
+    # 2. EJECUCIÓN DE LA TRAYECTORIA INTERPOLADA POR WAYPOINTS (Forma de Herradura)
+   
+    # FASE A: Elevación vertical pura (Ganar Clearance)
+    # Sube el brazo desde donde está hacia la altura segura, manteniendo su X e Y actuales.
+    print(f"\n[FASE A] Elevando verticalmente el brazo hasta Z segura = {Z_TRANSITO_SEGURO}mm...")
+    mc.send_coords([x_act, y_act, Z_TRANSITO_SEGURO, rx, ry, rz], VELOCIDAD_TRAYECTORIA, 1)
+    time.sleep(2.5) # Tiempo para asegurar que termine de subir
+   
+    # FASE B: Traslación horizontal (Vuelo sobre obstáculos)
+    # Se desplaza horizontalmente por el aire hacia el X e Y del destino, totalmente por encima de las cajas.
+    print(f"[FASE B] Desplazamiento horizontal seguro sobrevolando las cajas hacia X={x_dest}, Y={y_dest}...")
+    mc.send_coords([x_dest, y_dest, Z_TRANSITO_SEGURO, rx, ry, rz], VELOCIDAD_TRAYECTORIA, 1)
+    time.sleep(2.5) # Tiempo para asegurar que termine el traslado horizontal
+   
+    # FASE C: Descenso vertical final
+    # Baja de forma recta y controlada al punto exacto de depósito final.
+    print(f"[FASE C] Descendiendo verticalmente al punto de destino final Z={z_dest}mm...")
+    mc.send_coords([x_dest, y_dest, z_dest, rx, ry, rz], VELOCIDAD_TRAYECTORIA, 1)
+    time.sleep(2.5)
+    print("[ÉXITO] Destino alcanzado de forma segura. Objetos del entorno esquivados.")
+   
+    # 3. RETORNO OBLIGATORIO AL ESTADO ORIGINAL
+    # Una vez cumplida la tarea, el robot se retira de la zona de peligro volviendo a la pose Home.
+    print("\n-> [RETORNO AL ESTADO ORIGINAL] Regresando de forma automática a la pose segura de referencia...")
+    mc.send_angles(POSE_ORIGINAL_ANGULOS, VELOCIDAD_RETORNO)
+    time.sleep(3.5)
+    print("[SISTEMA COMPLETADO] El robot ha vuelto a su estado original y queda libre de atascos.")
+    return True
+
+
+# ==========================================
+# 4. PRUEBA DEL PIPELINE EN EL LABORATORIO
+# ==========================================
+
+
+# 1. Asegurar que el robot arranque en la pose de referencia (Estado Original)
+print("Sincronizando posición inicial (Estado Original)...")
+mc.send_angles(POSE_ORIGINAL_ANGULOS, VELOCIDAD_TRAYECTORIA)
+time.sleep(3)
+
+
+# Orientación estándar del gripper mirando hacia las cajas
+rx, ry, rz = 175.0, 0.0, -90.0
+
+
+# Coordenada destino de prueba (por ejemplo, el interior de una caja de depósito lateral)
+coordenadas_destino_caja = [125.0, 110.0, 95.0, rx, ry, rz]
+
+
+# Ejecutar el script protector del escenario 2
+ejecutar_movimiento_anti_entorno(coordenadas_destino_caja)
+
+
