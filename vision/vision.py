@@ -30,7 +30,7 @@ def detectar_y_calcular_coordenadas(frame, color_objetivo):
     """
     Recibe un frame de video y un string con el color objetivo ('rojo', 'azul', etc.). 
     Aplica filtros morfológicos, halla el centroide y lo transforma a mm reales. # Filtro para borrar ruido visual
-    Retorna: (x_mm, y_mm) o None si no encuentra el objeto.
+    Retorna: (x_mm, y_mm) o None si no encuentra el objeto. # Retorna None si no hay objeto
     """
     if frame is None:
         return None
